@@ -1,7 +1,7 @@
 #include <ArduinoJson.h>
 #include "base64.hpp"
 
-const uint16_t base64Size = 512;
+const uint16_t base64Size = 10000;
 
 struct encodedResult {
   // unsigned char* message;
@@ -13,14 +13,14 @@ struct encodedResult {
 
 // so far 512 and 1024 json buffer works
 char* generateAccJson() {
-  const unsigned int jsonBufferSize = 1024;
+  const unsigned int jsonBufferSize = 10000;
 
   static char accJsonBuffer[jsonBufferSize];  // Statically allocate buffer
-  StaticJsonDocument<(jsonBufferSize * 2)> doc;    // Reuse the JsonDocument
+  StaticJsonDocument<1024> doc;    // Reuse the JsonDocument
 
-  unsigned char base64BufferX[base64Size];
-  unsigned char base64BufferY[base64Size];
-  unsigned char base64BufferZ[base64Size];
+  // unsigned char base64BufferX[base64Size];
+  // unsigned char base64BufferY[base64Size];
+  // unsigned char base64BufferZ[base64Size];
 
   // Clear the document for reuse
   doc.clear();
@@ -28,18 +28,18 @@ char* generateAccJson() {
   JsonObject data = body.createNestedObject("DATA");
 
   // pass in buffers as reference so that value is not deleted after the function call
-  struct encodedResult er = encode64Buffers(base64BufferX, base64BufferY, base64BufferZ);
+  // struct encodedResult er = encode64Buffers(base64BufferX, base64BufferY, base64BufferZ);
 
   body["ACTION"] = "sendAccDataPackets";
   body["SESSION_ID"] = uuid.toCharArray();
   body["MACHINE_ID"] = "Ender3Test";
-  data["X"] = (char*) er.xMessage;
-  data["X_LENGTH"] = er.length;
-  data["Y"] = (char*) er.yMessage;
-  data["Y_LENGTH"] = er.length;
-  data["Z"] = (char*) er.zMessage;
-  data["Z_LENGTH"] = er.length;
-  data["COUNT"] = counter++;
+  // data["X"] = (char*) er.xMessage;
+  // data["X_LENGTH"] = er.length;
+  // data["Y"] = (char*) er.yMessage;
+  // data["Y_LENGTH"] = er.length;
+  // data["Z"] = (char*) er.zMessage;
+  // data["Z_LENGTH"] = er.length;
+  // data["COUNT"] = counter++;
 
   serializeJson(doc, accJsonBuffer, sizeof(accJsonBuffer));
   Serial.println("JSON generated.");

@@ -24,7 +24,7 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  startFifo();
+  // startFifo();
   while (!(collectionFinished && isFifoEmpty())) {
 
     checkMQTT();

@@ -19,9 +19,12 @@
 
 #define IMU_CS 5
 
+#define IMU_INT1 47
+#define IMU_INT2 48
+
 SensorQMI8658 qmi;
 
-const uint8_t bufferSize = 128;
+const uint16_t bufferSize = 4096;
 const uint8_t bufferClone = 2;
 
 // initialize the double buffer kernel and user
@@ -30,7 +33,7 @@ uint8_t uartKernel = 0;
 
 IMUdataRaw accDataBuffer[bufferClone][bufferSize];
 IMUdataRaw gyroDataBuffer[0];  // keep only one for gyro data buffer, since we are not collecting gyro data
-uint8_t accDataCounter[bufferClone][1] = { { 0 }, { 0 } };
+uint16_t accDataCounter[bufferClone][1] = { { 0 }, { 0 } };
 
 void setupIMU(void) {
 
@@ -56,7 +59,6 @@ void setupIMU(void) {
   Serial.print("Device ID:");
   Serial.println(qmi.getChipID(), HEX);
 
-
   qmi.configAccelerometer(
     /*
          * ACC_RANGE_2G
@@ -77,7 +79,7 @@ void setupIMU(void) {
          * ACC_ODR_LOWPOWER_11Hz
          * ACC_ODR_LOWPOWER_3H
         * */
-    SensorQMI8658::ACC_ODR_1000Hz,
+    SensorQMI8658::ACC_ODR_125Hz,
     // SensorQMI8658::ACC_ODR_LOWPOWER_128Hz,
     /*
         *  LPF_MODE_0     //2.66% of ODR
@@ -85,9 +87,17 @@ void setupIMU(void) {
         *  LPF_MODE_2     //5.39% of ODR
         *  LPF_MODE_3     //13.37% of ODR
         * */
-    SensorQMI8658::LPF_MODE_3,
+    SensorQMI8658::LPF_MODE_0,
     // selfTest enable
     true);
+
+
+  // enable interrupt
+  qmi.disableSyncSampleMode(); // sync sample mode 0 for fifo
+  attachWTMInterrupt(); 
+  startFifo();
+  // Enable data ready to interrupt pin2
+  qmi.enableINT(SensorQMI8658::IntPin2);
 
   qmi.disableGyroscope();
   qmi.enableAccelerometer();
@@ -120,7 +130,14 @@ void clearBuffers() {
 
 void getAcceleration() {
 
-  if (qmi.getFIFOSampleCount() > 0) {
+  bool status = qmi.isFIFOHitWTM();
+  Serial.println("Interrupt Detected.");
+  Serial.print("Status: ");
+  Serial.println(status);
+  Serial.print("Sample Count: ");
+  Serial.println(qmi.getFIFOSampleCount());
+  // if (qmi.getFIFOSampleCount() > 0) {
+  if (status) {
     if (accDataCounter[uartKernel][0] >= bufferSize) {
       if (accDataCounter[uartUser][0] == 0) {
         switchBuffers();
@@ -133,7 +150,7 @@ void getAcceleration() {
     }
 
     // If the reading is successful, counter will be returned
-    // passing in the address of the array which is the first element of the array, the last parameter is the startFrom index to 
+    // passing in the address of the array which is the first element of the array, the last parameter is the startFrom index to
     // tell the program where the indexing is starting from
     int bufferCounter = qmi.readFromFifoRaw(&accDataBuffer[uartKernel][0], (bufferSize - accDataCounter[uartKernel][0]), &gyroDataBuffer[0], 0, accDataCounter[uartKernel][0]);
 
@@ -162,8 +179,8 @@ void resetFifo() {
   qmi.resetFIFO();
 }
 
-void stopFifo(){
-    qmi.configFIFO(
+void stopFifo() {
+  qmi.configFIFO(
     /**
         * FIFO_MODE_BYPASS      -- Disable fifo
         * FIFO_MODE_FIFO        -- Will not overwrite
@@ -179,13 +196,13 @@ void stopFifo(){
     SensorQMI8658::FIFO_SAMPLES_128,
 
     //FiFo mapped interrupt IO port
-    SensorQMI8658::IntPin1,
+    SensorQMI8658::IntPin2,
     // watermark level
-    8);
+    64);
 }
 
-void startFifo(){
-    qmi.configFIFO(
+void startFifo() {
+  qmi.configFIFO(
     /**
         * FIFO_MODE_BYPASS      -- Disable fifo
         * FIFO_MODE_FIFO        -- Will not overwrite
@@ -201,16 +218,25 @@ void startFifo(){
     SensorQMI8658::FIFO_SAMPLES_128,
 
     //FiFo mapped interrupt IO port
-    SensorQMI8658::IntPin1,
+    SensorQMI8658::IntPin2,
     // watermark level
-    8);
+    64);
 }
 
 void publishAcceleration(char* currentUUID) {
   if (accDataCounter[uartUser][0] == bufferSize) {
-    const char* jsonMessage = generateAccJson();
-    publishMessage(jsonMessage);
+    // const char* jsonMessage = generateAccJson();
+    // publishMessage(jsonMessage);
 
     accDataCounter[uartUser][0] = 0;
   }
+}
+
+void attachWTMInterrupt() {
+
+  pinMode(IMU_INT1, INPUT_PULLUP);
+#ifdef IMU_INT2
+  pinMode(IMU_INT2, INPUT_PULLUP);
+#endif
+  attachInterrupt(digitalPinToInterrupt(IMU_INT2), getAcceleration, HIGH);
 }
