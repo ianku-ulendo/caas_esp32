@@ -234,9 +234,9 @@ void publishAcceleration(char* currentUUID) {
 
 void attachWTMInterrupt() {
 
-  pinMode(IMU_INT1, INPUT_PULLUP);
+  pinMode(IMU_INT1, INPUT);
 #ifdef IMU_INT2
-  pinMode(IMU_INT2, INPUT_PULLUP);
+  pinMode(IMU_INT2, INPUT);
 #endif
-  attachInterrupt(digitalPinToInterrupt(IMU_INT2), getAcceleration, HIGH);
+  attachInterrupt(IMU_INT2, getAcceleration, HIGH);
 }
